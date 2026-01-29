@@ -260,11 +260,16 @@ class ChatService:
         """Prepare context string from search results."""
         parts = []
         
+        print(f"[ChatService] Preparing context from search results...")
+        print(f"[ChatService] Course results: {len(search_results.get('course_results', []))}")
+        print(f"[ChatService] Web results: {len(search_results.get('web_results', []))}")
+        
         # Course context
         for i, result in enumerate(search_results.get("course_results", [])[:3], 1):
             content = result.get("content", "")
             title = result.get("material_title", "Course Material")
             parts.append(f"📚 [Course Source {i}: {title}]\n{content}")
+            print(f"[ChatService] Added course source: {title}")
         
         # Web context
         for i, result in enumerate(search_results.get("web_results", [])[:2], 1):
@@ -273,7 +278,10 @@ class ChatService:
             url = result.get("url", "")
             parts.append(f"🌐 [Web Source {i}: {title}]\nURL: {url}\n{snippet}")
         
-        return "\n\n---\n\n".join(parts) if parts else "No relevant context found."
+        context = "\n\n---\n\n".join(parts) if parts else "No relevant context found."
+        print(f"[ChatService] Final context length: {len(context)} chars")
+        
+        return context
 
 
 # Singleton instance

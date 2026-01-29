@@ -70,7 +70,7 @@ async def list_sessions(
 ):
     """List all chat sessions for current user."""
     try:
-        sessions = await service.list_sessions(
+        sessions = await service.get_sessions(
             user_id=UUID(current_user.id),
             course_id=course_id
         )
@@ -90,7 +90,7 @@ async def get_session(
 ):
     """Get a chat session with all messages."""
     try:
-        session = await service.get_session(session_id)
+        session = await service.get_session_history(session_id)
         if not session:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -124,11 +124,12 @@ async def send_message(
     """
     try:
         async def generate():
-            async for chunk in service.chat_stream(
+            async for chunk in service.stream_message(
                 session_id=request.session_id,
-                message=request.message,
-                include_web_search=request.include_web_search,
-                user_id=UUID(current_user.id)
+                user_id=UUID(current_user.id),
+                course_id=request.course_id,
+                content=request.message,
+                include_web_search=request.include_web_search
             ):
                 yield f"data: {chunk}\n\n"
             yield "data: [DONE]\n\n"

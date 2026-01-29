@@ -60,7 +60,7 @@ class VectorStore:
         limit: int = 5,
         category: Optional[str] = None,
         file_type: Optional[str] = None,
-        threshold: float = 0.5
+        threshold: float = 0.0  # Lower default threshold to get more results
     ) -> List[Dict[str, Any]]:
         """
         Search for similar documents using vector similarity.
@@ -80,8 +80,17 @@ class VectorStore:
             # Generate query embedding
             query_embedding = await self.embeddings.embed_query(query)
             
+            print(f"[VectorStore] Searching for query: '{query[:50]}...' in course: {course_id}")
+            print(f"[VectorStore] Threshold: {threshold}, Limit: {limit}")
+            
+            # First, check if any embeddings exist for this course
+            count_check = self.supabase.rpc(
+                "count_embeddings_by_course",
+                {"p_course_id": str(course_id)}
+            ).execute()
+            print(f"[VectorStore] Total embeddings for course: {count_check.data}")
+            
             # Build RPC call for vector similarity search
-            # This uses a Supabase function we'll create
             result = self.supabase.rpc(
                 "match_documents",
                 {
@@ -92,9 +101,16 @@ class VectorStore:
                 }
             ).execute()
             
+            print(f"[VectorStore] Found {len(result.data) if result.data else 0} results")
+            if result.data:
+                for r in result.data[:2]:
+                    print(f"[VectorStore] Result: {r.get('content', '')[:100]}... (similarity: {r.get('similarity', 0):.3f})")
+            
             return result.data if result.data else []
         except Exception as e:
-            print(f"Vector search error: {e}")
+            print(f"[VectorStore] Error: {e}")
+            import traceback
+            traceback.print_exc()
             return []
     
     async def delete_by_material(self, material_id: UUID) -> int:

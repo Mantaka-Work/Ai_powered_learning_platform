@@ -39,6 +39,9 @@ class RAGChains:
         """
         system_prompt = self._build_system_prompt(context, web_context)
         
+        print(f"[RAGChains] Context length: {len(context)} chars")
+        print(f"[RAGChains] Context preview: {context[:500]}..." if len(context) > 500 else f"[RAGChains] Context: {context}")
+        
         messages = [SystemMessage(content=system_prompt)]
         
         # Add chat history
@@ -66,17 +69,11 @@ class RAGChains:
         
         Yields chunks of the response as they're generated.
         """
-        callback = AsyncIteratorCallbackHandler()
-        streaming_llm = ChatOpenAI(
-            model=settings.OPENAI_CHAT_MODEL,
-            temperature=settings.GENERATION_TEMPERATURE,
-            api_key=settings.OPENAI_API_KEY,
-            max_tokens=settings.MAX_GENERATION_TOKENS,
-            streaming=True,
-            callbacks=[callback]
-        )
-        
         system_prompt = self._build_system_prompt(context, web_context)
+        
+        print(f"[RAGChains-Stream] Context length: {len(context)} chars")
+        print(f"[RAGChains-Stream] Context preview: {context[:500]}..." if len(context) > 500 else f"[RAGChains-Stream] Context: {context}")
+        
         messages = [SystemMessage(content=system_prompt)]
         
         if chat_history:
@@ -88,39 +85,41 @@ class RAGChains:
         
         messages.append(HumanMessage(content=query))
         
-        # Start generation in background
-        import asyncio
-        task = asyncio.create_task(streaming_llm.ainvoke(messages))
-        
-        async for token in callback.aiter():
-            yield token
-        
-        await task
+        # Use astream for streaming responses
+        async for chunk in self.llm.astream(messages):
+            if chunk.content:
+                yield chunk.content
     
     def _build_system_prompt(self, context: str, web_context: Optional[str] = None) -> str:
         """Build the system prompt with context."""
-        prompt = """You are an AI learning assistant for a university course platform. 
+        prompt = """You are an AI learning assistant for a university course platform.
 Your role is to help students understand course materials, answer questions, and provide explanations.
 
-IMPORTANT GUIDELINES:
-1. Base your answers primarily on the provided course materials
-2. If course materials don't cover a topic well, use web search results (if provided)
-3. Always cite your sources - indicate whether information comes from course materials (📚) or web search (🌐)
-4. Be educational, clear, and helpful
-5. If you're not sure about something, say so
-6. For code questions, provide working examples when possible
+CRITICAL INSTRUCTIONS - YOU MUST FOLLOW THESE:
+1. Answer ONLY using the information provided in the COURSE MATERIALS CONTEXT below
+2. If the answer IS in the context, provide a detailed, helpful answer citing the specific source
+3. If the answer is NOT in the context, say: "I couldn't find specific information about this in your course materials. The available materials cover: [briefly list what IS covered]"
+4. NEVER say "I don't have access to your files" - you DO have access through the context below
+5. NEVER say "I cannot access external files" - the relevant content is PROVIDED below
+6. Always cite which source the information comes from using 📚
 
-COURSE MATERIALS CONTEXT:
+COURSE MATERIALS CONTEXT (USE THIS TO ANSWER):
+---
 {context}
-""".format(context=context if context else "No relevant course materials found.")
+---
+
+Remember: The context above contains the relevant excerpts from the uploaded course materials. Base your answer on this content.
+""".format(context=context if context else "No course materials were found matching this query.")
         
         if web_context:
             prompt += """
 
-WEB SEARCH RESULTS (use as supplementary information):
+SUPPLEMENTARY WEB SEARCH RESULTS (use only if course materials don't cover the topic):
+---
 {web_context}
+---
 
-Note: Web results should supplement, not replace, course materials.
+Note: Prefer course materials (📚) over web results (🌐).
 """.format(web_context=web_context)
         
         return prompt
