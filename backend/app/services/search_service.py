@@ -3,7 +3,7 @@ import time
 from typing import Optional, List, Dict, Any
 from uuid import UUID
 
-from app.core.rag.embeddings import get_embedding_service
+from app.core.rag.embeddings import get_embeddings_service
 from app.core.rag.retriever import get_retriever
 from app.core.mcp.web_search_service import get_web_search_service
 from app.db.repositories.material_repo import get_material_repository
@@ -14,7 +14,7 @@ class SearchService:
     """Service for hybrid search (course materials + web)."""
     
     def __init__(self):
-        self.embedding_service = get_embedding_service()
+        self.embedding_service = get_embeddings_service()
         self.retriever = get_retriever()
         self.web_search = get_web_search_service()
         self.material_repo = get_material_repository()
@@ -38,13 +38,10 @@ class SearchService:
         results = await self.retriever.retrieve(
             query=query,
             course_id=course_id,
-            top_k=limit,
-            threshold=0.3
+            limit=limit,
+            category=category,
+            file_type=file_type
         )
-        
-        # Apply additional filters if specified
-        if category or file_type:
-            results = await self._filter_results(results, category, file_type)
         
         # Enrich results with material metadata
         enriched = await self._enrich_results(results)
@@ -87,12 +84,9 @@ class SearchService:
         course_results = await self.retriever.retrieve(
             query=query,
             course_id=course_id,
-            top_k=limit,
-            threshold=0.3
+            limit=limit,
+            category=category
         )
-        
-        if category:
-            course_results = await self._filter_results(course_results, category, None)
         
         enriched_course = await self._enrich_results(course_results)
         

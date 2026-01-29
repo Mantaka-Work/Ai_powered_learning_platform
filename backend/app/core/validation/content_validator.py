@@ -2,7 +2,7 @@
 from typing import Dict, Any, List, Optional
 from uuid import UUID
 from langchain_openai import ChatOpenAI
-from langchain.schema import HumanMessage
+from langchain_core.messages import HumanMessage
 
 from app.config import settings
 from app.core.rag.retriever import get_retriever

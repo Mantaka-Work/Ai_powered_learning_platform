@@ -1,9 +1,8 @@
 """LangChain chains and prompts for RAG operations."""
 from typing import List, Dict, Any, Optional, AsyncGenerator
 from langchain_openai import ChatOpenAI
-from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain.schema import HumanMessage, AIMessage, SystemMessage
-from langchain.callbacks import AsyncIteratorCallbackHandler
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 
 from app.config import settings
 

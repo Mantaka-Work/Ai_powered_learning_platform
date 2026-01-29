@@ -60,7 +60,8 @@ class GenerationService:
         # Generate content
         generated = await self.theory_generator.generate(
             topic=topic,
-            gen_type=gen_type,
+            course_id=course_id,
+            generation_type=gen_type,
             course_context=course_context,
             web_context=web_context if use_web else None
         )
@@ -91,9 +92,9 @@ class GenerationService:
         validation_result = None
         if validate:
             validation_result = await self.content_validator.validate(
-                content=generated,
-                content_type=gen_type,
-                sources=course_context
+                content=generated["content"],
+                topic=topic,
+                course_id=course_id
             )
         
         # Store generation
@@ -103,7 +104,7 @@ class GenerationService:
             user_id=user_id,
             gen_type=f"theory_{gen_type}",
             topic=topic,
-            content=generated,
+            content=generated["content"],
             validation_status=validation_result["status"] if validation_result else None,
             validation_score=validation_result["score"] if validation_result else None,
             validation_details=validation_result if validation_result else None,
@@ -120,7 +121,7 @@ class GenerationService:
             "status": "completed",
             "type": f"theory_{gen_type}",
             "topic": topic,
-            "content": generated,
+            "content": generated["content"],
             "validation_status": validation_result["status"] if validation_result else None,
             "validation_score": validation_result["score"] if validation_result else None,
             "sources": sources,
@@ -170,8 +171,8 @@ class GenerationService:
         # Generate code
         generated = await self.code_generator.generate(
             topic=topic,
+            course_id=course_id,
             language=language,
-            code_type=code_type,
             course_context=course_context,
             web_context=web_context if use_web else None
         )
@@ -204,7 +205,7 @@ class GenerationService:
             validation_result = await self.code_validator.validate(
                 code=generated["code"],
                 language=language,
-                execute=execute
+                run_tests=execute
             )
         
         # Store generation

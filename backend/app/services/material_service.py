@@ -7,10 +7,10 @@ from pathlib import Path
 from app.db.supabase_client import get_supabase_client
 from app.db.repositories.material_repo import get_material_repository
 from app.db.repositories.vector_repo import get_vector_repository
-from app.core.document_processing.parsers import DocumentParser, get_document_parser
-from app.core.document_processing.chunking import ChunkingStrategy, get_chunking_strategy
+from app.core.document_processing.parsers import DocumentParser, get_parser
+from app.core.document_processing.chunking import TextChunker, get_chunker
 from app.core.document_processing.metadata_extractor import MetadataExtractor, get_metadata_extractor
-from app.core.rag.embeddings import EmbeddingService, get_embedding_service
+from app.core.rag.embeddings import EmbeddingsService, get_embeddings_service
 from app.config import settings
 
 
@@ -21,10 +21,10 @@ class MaterialService:
         self.supabase = get_supabase_client()
         self.material_repo = get_material_repository()
         self.vector_repo = get_vector_repository()
-        self.parser = get_document_parser()
-        self.chunker = get_chunking_strategy()
+        self.parser = get_parser()
+        self.chunker = get_chunker()
         self.metadata_extractor = get_metadata_extractor()
-        self.embedding_service = get_embedding_service()
+        self.embedding_service = get_embeddings_service()
         self.storage_bucket = "course-materials"
     
     async def upload_material(

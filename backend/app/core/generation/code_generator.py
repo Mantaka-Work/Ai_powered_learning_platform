@@ -2,7 +2,7 @@
 from typing import Optional, Dict, Any, List
 from uuid import UUID
 from langchain_openai import ChatOpenAI
-from langchain.schema import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.config import settings
 from app.core.generation.prompts import CODE_PROMPTS

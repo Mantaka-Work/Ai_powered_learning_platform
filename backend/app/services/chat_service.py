@@ -2,8 +2,8 @@
 from typing import Optional, List, Dict, Any, AsyncGenerator
 from uuid import UUID
 
-from app.core.rag.chains import get_rag_chain
-from app.core.rag.memory import get_memory_manager
+from app.core.rag.chains import get_chains
+from app.core.rag.memory import get_memory
 from app.services.search_service import get_search_service
 from app.db.repositories.chat_repo import get_chat_repository
 from app.config import settings
@@ -13,8 +13,8 @@ class ChatService:
     """Service for chat interactions with RAG."""
     
     def __init__(self):
-        self.rag_chain = get_rag_chain()
-        self.memory_manager = get_memory_manager()
+        self.rag_chain = get_chains()
+        self.memory = get_memory()
         self.search_service = get_search_service()
         self.chat_repo = get_chat_repository()
     
@@ -78,7 +78,7 @@ class ChatService:
         )
         
         # Get conversation history
-        history = await self.memory_manager.get_history(session_id, limit=10)
+        history = await self.memory.get_history(session_id, limit=10)
         
         # Search for relevant context
         search_results = await self.search_service.hybrid_search(
@@ -92,10 +92,10 @@ class ChatService:
         context = self._prepare_context(search_results)
         
         # Generate response
-        response = await self.rag_chain.generate(
+        response = await self.rag_chain.generate_response(
             query=content,
             context=context,
-            history=history
+            chat_history=history
         )
         
         # Prepare sources
@@ -128,10 +128,11 @@ class ChatService:
         )
         
         # Update memory
-        await self.memory_manager.add_turn(
+        await self.memory.add_message(
             session_id=session_id,
-            user_message=content,
-            assistant_message=response
+            role="assistant",
+            content=response,
+            used_web_search=used_web
         )
         
         return {
@@ -161,7 +162,7 @@ class ChatService:
         )
         
         # Get conversation history
-        history = await self.memory_manager.get_history(session_id, limit=10)
+        history = await self.memory.get_history(session_id, limit=10)
         
         # Search for relevant context
         search_results = await self.search_service.hybrid_search(
@@ -199,10 +200,10 @@ class ChatService:
         
         # Stream response
         full_response = ""
-        async for chunk in self.rag_chain.stream(
+        async for chunk in self.rag_chain.generate_response_stream(
             query=content,
             context=context,
-            history=history
+            chat_history=history
         ):
             full_response += chunk
             yield {
@@ -220,10 +221,11 @@ class ChatService:
         )
         
         # Update memory
-        await self.memory_manager.add_turn(
+        await self.memory.add_message(
             session_id=session_id,
-            user_message=content,
-            assistant_message=full_response
+            role="assistant",
+            content=full_response,
+            used_web_search=used_web
         )
         
         # Yield completion signal
@@ -239,7 +241,7 @@ class ChatService:
     ) -> bool:
         """Delete a chat session."""
         # Also clear memory
-        await self.memory_manager.clear(session_id)
+        await self.memory.clear_history(session_id)
         
         return await self.chat_repo.delete_session(session_id, user_id)
     

@@ -1,7 +1,7 @@
 """Application configuration and settings."""
 from functools import lru_cache
 from pydantic_settings import BaseSettings
-from typing import Optional
+from typing import Optional, List
 
 
 class Settings(BaseSettings):
@@ -49,9 +49,18 @@ class Settings(BaseSettings):
         ".md", ".txt", ".json", ".yaml", ".yml"
     ]
     
+    # Security/JWT
+    JWT_SECRET_KEY: str = "change-this-in-production"
+    JWT_ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    
+    # CORS
+    ALLOWED_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000"
+    
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
+        extra = "ignore"  # Ignore extra fields in .env
 
 
 @lru_cache()

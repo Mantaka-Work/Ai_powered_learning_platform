@@ -5,14 +5,14 @@ from contextlib import asynccontextmanager
 
 from app.config import settings
 from app.api.routes import auth, materials, search, generate, chat, validation, health
-from app.utils.logger import setup_logging
+from app.utils.logger import setup_logger
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan events."""
     # Startup
-    setup_logging()
+    setup_logger()
     print(f"🚀 {settings.APP_NAME} v{settings.APP_VERSION} starting...")
     yield
     # Shutdown
