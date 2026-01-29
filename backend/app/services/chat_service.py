@@ -91,14 +91,21 @@ class ChatService:
             include_web=include_web_search
         )
         
-        # Prepare context
-        context = self._prepare_context(search_results)
+        # Prepare context and determine if it's relevant
+        context, context_relevance = self._prepare_context_with_relevance(search_results)
         
-        # Generate response
+        # Determine if we should use course context or general knowledge
+        # Threshold of 0.2 - if avg relevance is above this and we have results, use course context
+        use_course_context = context_relevance >= 0.2 and len(search_results.get("course_results", [])) > 0
+        
+        print(f"[ChatService] Context relevance: {context_relevance:.3f}, Use course context: {use_course_context}")
+        
+        # Generate response with appropriate mode
         response = await self.rag_chain.generate_response(
             query=content,
-            context=context,
-            chat_history=history
+            context=context if use_course_context else "",
+            chat_history=history,
+            use_general_knowledge=not use_course_context
         )
         
         # Prepare sources
@@ -175,8 +182,14 @@ class ChatService:
             include_web=include_web_search
         )
         
-        # Prepare context
-        context = self._prepare_context(search_results)
+        # Prepare context and determine relevance
+        context, context_relevance = self._prepare_context_with_relevance(search_results)
+        
+        # Determine if we should use course context or general knowledge
+        # Threshold of 0.2 - if avg relevance is above this and we have results, use course context
+        use_course_context = context_relevance >= 0.2 and len(search_results.get("course_results", [])) > 0
+        
+        print(f"[ChatService-Stream] Context relevance: {context_relevance:.3f}, Use course context: {use_course_context}")
         
         # Prepare sources early
         sources = {
@@ -194,19 +207,21 @@ class ChatService:
                 for r in search_results.get("web_results", [])[:3]
             ]
         
-        # Yield sources first
+        # Yield sources first (include whether using general knowledge)
         yield {
             "type": "sources",
             "sources": sources,
-            "used_web_search": used_web
+            "used_web_search": used_web,
+            "used_general_knowledge": not use_course_context
         }
         
         # Stream response
         full_response = ""
         async for chunk in self.rag_chain.generate_response_stream(
             query=content,
-            context=context,
-            chat_history=history
+            context=context if use_course_context else "",
+            chat_history=history,
+            use_general_knowledge=not use_course_context
         ):
             full_response += chunk
             yield {
@@ -258,18 +273,25 @@ class ChatService:
     
     def _prepare_context(self, search_results: Dict) -> str:
         """Prepare context string from search results."""
+        return self._prepare_context_with_relevance(search_results)[0]
+    
+    def _prepare_context_with_relevance(self, search_results: Dict) -> tuple[str, float]:
+        """Prepare context string and return average relevance score."""
         parts = []
+        relevance_scores = []
         
         print(f"[ChatService] Preparing context from search results...")
         print(f"[ChatService] Course results: {len(search_results.get('course_results', []))}")
         print(f"[ChatService] Web results: {len(search_results.get('web_results', []))}")
         
-        # Course context
-        for i, result in enumerate(search_results.get("course_results", [])[:3], 1):
+        # Course context - include more results (up to 5) for better coverage
+        for i, result in enumerate(search_results.get("course_results", [])[:5], 1):
             content = result.get("content", "")
             title = result.get("material_title", "Course Material")
+            score = result.get("relevance_score", 0)
+            relevance_scores.append(score)
             parts.append(f"📚 [Course Source {i}: {title}]\n{content}")
-            print(f"[ChatService] Added course source: {title}")
+            print(f"[ChatService] Added course source: {title} (score: {score:.3f})")
         
         # Web context
         for i, result in enumerate(search_results.get("web_results", [])[:2], 1):
@@ -278,10 +300,13 @@ class ChatService:
             url = result.get("url", "")
             parts.append(f"🌐 [Web Source {i}: {title}]\nURL: {url}\n{snippet}")
         
-        context = "\n\n---\n\n".join(parts) if parts else "No relevant context found."
-        print(f"[ChatService] Final context length: {len(context)} chars")
+        context = "\n\n---\n\n".join(parts) if parts else ""
+        avg_relevance = sum(relevance_scores) / len(relevance_scores) if relevance_scores else 0.0
         
-        return context
+        print(f"[ChatService] Final context length: {len(context)} chars")
+        print(f"[ChatService] Average relevance: {avg_relevance:.3f}")
+        
+        return context, avg_relevance
 
 
 # Singleton instance
