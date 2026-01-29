@@ -21,13 +21,36 @@ class EmbeddingsService:
         return response.data[0].embedding
     
     async def embed_texts(self, texts: List[str]) -> List[List[float]]:
-        """Generate embeddings for multiple texts."""
-        # OpenAI supports batch embedding
-        response = await self.client.embeddings.create(
-            model=self.model,
-            input=texts
-        )
-        return [item.embedding for item in response.data]
+        """Generate embeddings for multiple texts, processing one at a time to avoid token limits."""
+        if not texts:
+            return []
+        
+        # Max safe characters per text (~2000 chars ≈ 500 tokens, well under 8192 limit)
+        MAX_CHARS_PER_TEXT = 2000
+        
+        all_embeddings = []
+        for text in texts:
+            # Truncate if too long
+            if len(text) > MAX_CHARS_PER_TEXT:
+                text = text[:MAX_CHARS_PER_TEXT]
+            
+            # Skip empty texts
+            if not text.strip():
+                # Return a zero embedding for empty texts
+                all_embeddings.append([0.0] * self.dimension)
+                continue
+            
+            try:
+                response = await self.client.embeddings.create(
+                    model=self.model,
+                    input=text
+                )
+                all_embeddings.append(response.data[0].embedding)
+            except Exception as e:
+                print(f"Warning: Failed to embed text, using zero vector: {e}")
+                all_embeddings.append([0.0] * self.dimension)
+        
+        return all_embeddings
     
     async def embed_query(self, query: str) -> List[float]:
         """Generate embedding for a search query."""

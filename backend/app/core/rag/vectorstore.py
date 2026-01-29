@@ -14,7 +14,7 @@ class VectorStore:
     def __init__(self):
         self.supabase = get_supabase_client()
         self.embeddings = get_embeddings_service()
-        self.table_name = "document_chunks"
+        self.table_name = "document_embeddings"
     
     async def add_documents(
         self,
@@ -76,24 +76,26 @@ class VectorStore:
         Returns:
             List of matching documents with scores
         """
-        # Generate query embedding
-        query_embedding = await self.embeddings.embed_query(query)
-        
-        # Build RPC call for vector similarity search
-        # This uses a Supabase function we'll create
-        result = self.supabase.rpc(
-            "match_documents",
-            {
-                "query_embedding": query_embedding,
-                "match_count": limit,
-                "filter_course_id": str(course_id),
-                "filter_category": category,
-                "filter_file_type": file_type,
-                "similarity_threshold": threshold
-            }
-        ).execute()
-        
-        return result.data if result.data else []
+        try:
+            # Generate query embedding
+            query_embedding = await self.embeddings.embed_query(query)
+            
+            # Build RPC call for vector similarity search
+            # This uses a Supabase function we'll create
+            result = self.supabase.rpc(
+                "match_documents",
+                {
+                    "query_embedding": query_embedding,
+                    "match_count": limit,
+                    "filter_course_id": str(course_id),
+                    "similarity_threshold": threshold
+                }
+            ).execute()
+            
+            return result.data if result.data else []
+        except Exception as e:
+            print(f"Vector search error: {e}")
+            return []
     
     async def delete_by_material(self, material_id: UUID) -> int:
         """Delete all chunks for a material."""

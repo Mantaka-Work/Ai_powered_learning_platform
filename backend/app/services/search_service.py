@@ -99,7 +99,7 @@ class SearchService:
         
         if include_web is None:
             # Auto-decide based on relevance threshold
-            should_use_web = avg_relevance < settings.WEB_SEARCH_THRESHOLD
+            should_use_web = avg_relevance < settings.WEB_SEARCH_RELEVANCE_THRESHOLD
         else:
             should_use_web = include_web
         

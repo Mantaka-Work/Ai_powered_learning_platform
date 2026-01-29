@@ -285,3 +285,102 @@ export function GeneratedContent({
         </Card>
     )
 }
+
+// Main GenerationInterface component that combines GenerationForm and GeneratedContent
+interface GenerationInterfaceProps {
+    courseId: string
+}
+
+export function GenerationInterface({ courseId }: GenerationInterfaceProps) {
+    const [isLoading, setIsLoading] = useState(false)
+    const [generatedContent, setGeneratedContent] = useState<{
+        content: string
+        type: string
+        topic: string
+        validationStatus?: string
+        validationScore?: number
+        sources?: any
+        usedWebSearch: boolean
+        language?: string
+    } | null>(null)
+    const [error, setError] = useState<string | null>(null)
+
+    const handleGenerate = async (
+        topic: string,
+        type: 'theory' | 'code',
+        options: {
+            genType?: string
+            language?: string
+            useWeb?: boolean
+        }
+    ) => {
+        setIsLoading(true)
+        setError(null)
+        try {
+            const endpoint = type === 'theory' ? 'theory' : 'code'
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/generate/${endpoint}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    course_id: courseId,
+                    topic,
+                    type: options.genType,
+                    language: options.language,
+                    use_web: options.useWeb,
+                }),
+            })
+
+            if (!response.ok) {
+                throw new Error('Generation failed')
+            }
+
+            const data = await response.json()
+            setGeneratedContent({
+                content: data.content,
+                type: data.type,
+                topic: data.topic,
+                validationStatus: data.validation_status,
+                validationScore: data.validation_score,
+                sources: data.sources,
+                usedWebSearch: data.used_web_search,
+                language: options.language,
+            })
+        } catch (err: any) {
+            setError(err.message || 'Generation failed')
+            console.error('Generation error:', err)
+        }
+        setIsLoading(false)
+    }
+
+    return (
+        <div className="space-y-6">
+            <GenerationForm onGenerate={handleGenerate} isLoading={isLoading} />
+
+            {error && (
+                <div className="p-4 bg-destructive/10 text-destructive rounded-lg">
+                    {error}
+                </div>
+            )}
+
+            {generatedContent && !error && (
+                <GeneratedContent
+                    content={generatedContent.content}
+                    type={generatedContent.type}
+                    topic={generatedContent.topic}
+                    validationStatus={generatedContent.validationStatus}
+                    validationScore={generatedContent.validationScore}
+                    sources={generatedContent.sources}
+                    usedWebSearch={generatedContent.usedWebSearch}
+                    language={generatedContent.language}
+                />
+            )}
+
+            {!generatedContent && !error && !isLoading && (
+                <div className="text-center py-12 text-muted-foreground">
+                    <Sparkles className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>Fill in the form above to generate content</p>
+                </div>
+            )}
+        </div>
+    )
+}

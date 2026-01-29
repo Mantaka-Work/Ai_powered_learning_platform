@@ -18,8 +18,8 @@ class TextChunker:
     
     def __init__(
         self,
-        chunk_size: int = 1000,
-        chunk_overlap: int = 200,
+        chunk_size: int = 500,
+        chunk_overlap: int = 50,
         separator: str = "\n\n"
     ):
         """

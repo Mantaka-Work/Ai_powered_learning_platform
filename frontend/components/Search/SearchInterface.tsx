@@ -215,3 +215,87 @@ function WebResultCard({ result }: { result: WebSearchResult }) {
         </Card>
     )
 }
+
+// Main SearchInterface component that combines SearchBox and SearchResults
+interface SearchInterfaceProps {
+    courseId: string
+}
+
+export function SearchInterface({ courseId }: SearchInterfaceProps) {
+    const [isLoading, setIsLoading] = useState(false)
+    const [hasSearched, setHasSearched] = useState(false)
+    const [courseResults, setCourseResults] = useState<SearchResult[]>([])
+    const [webResults, setWebResults] = useState<WebSearchResult[]>([])
+    const [usedWebSearch, setUsedWebSearch] = useState(false)
+    const [averageRelevance, setAverageRelevance] = useState(0)
+    const [tookMs, setTookMs] = useState(0)
+    const [error, setError] = useState<string | null>(null)
+
+    const handleSearch = async (query: string, includeWeb?: boolean) => {
+        setIsLoading(true)
+        setError(null)
+        try {
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/search/hybrid`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    course_id: courseId,
+                    query,
+                    include_web: includeWeb,
+                    limit: 10,
+                }),
+            })
+
+            if (!response.ok) {
+                throw new Error('Search failed')
+            }
+
+            const data = await response.json()
+            setCourseResults(data.course_results || [])
+            setWebResults(data.web_results || [])
+            setUsedWebSearch(data.used_web_search || false)
+            setAverageRelevance(data.average_relevance || 0)
+            setTookMs(data.took_ms || 0)
+            setHasSearched(true)
+        } catch (err: any) {
+            setError(err.message || 'Search failed')
+            console.error('Search error:', err)
+        }
+        setIsLoading(false)
+    }
+
+    return (
+        <div className="space-y-6">
+            <div>
+                <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                    <Search className="h-5 w-5" />
+                    Search Course Materials
+                </h2>
+                <SearchBox onSearch={handleSearch} isLoading={isLoading} />
+            </div>
+
+            {error && (
+                <div className="p-4 bg-destructive/10 text-destructive rounded-lg">
+                    {error}
+                </div>
+            )}
+
+            {hasSearched && !error && (
+                <SearchResults
+                    courseResults={courseResults}
+                    webResults={webResults}
+                    usedWebSearch={usedWebSearch}
+                    averageRelevance={averageRelevance}
+                    tookMs={tookMs}
+                />
+            )}
+
+            {!hasSearched && !error && (
+                <div className="text-center py-12 text-muted-foreground">
+                    <Search className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>Enter a search query to find relevant course materials</p>
+                </div>
+            )}
+        </div>
+    )
+}

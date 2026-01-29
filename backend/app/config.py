@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     
     # Search
     SEARCH_TOP_K: int = 5
-    WEB_SEARCH_RELEVANCE_THRESHOLD: float = 0.40
+    WEB_SEARCH_RELEVANCE_THRESHOLD: float = 0.10
     
     # Generation
     MAX_GENERATION_TOKENS: int = 4096
@@ -47,6 +47,12 @@ class Settings(BaseSettings):
         ".pdf", ".pptx", ".docx", ".doc",
         ".py", ".js", ".ts", ".java", ".cpp", ".c", ".cs",
         ".md", ".txt", ".json", ".yaml", ".yml"
+    ]
+    # Alias for ALLOWED_EXTENSIONS (used by material_service)
+    SUPPORTED_FILE_TYPES: list = [
+        "pdf", "pptx", "docx", "doc",
+        "py", "js", "ts", "java", "cpp", "c", "cs",
+        "md", "txt", "json", "yaml", "yml"
     ]
     
     # Security/JWT

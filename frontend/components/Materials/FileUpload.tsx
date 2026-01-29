@@ -9,8 +9,8 @@ import { Badge } from '@/components/ui/badge'
 import { formatFileSize } from '@/lib/utils'
 
 interface FileUploadProps {
-    onUpload: (file: File, metadata: FileMetadata) => Promise<void>
-    isLoading?: boolean
+    courseId: string
+    onUploadSuccess?: () => void
     supportedTypes?: string[]
     maxSize?: number // in bytes
 }
@@ -23,8 +23,8 @@ interface FileMetadata {
 }
 
 export function FileUpload({
-    onUpload,
-    isLoading = false,
+    courseId,
+    onUploadSuccess,
     supportedTypes = ['pdf', 'pptx', 'docx', 'py', 'js', 'java', 'cpp', 'md', 'txt'],
     maxSize = 50 * 1024 * 1024, // 50MB
 }: FileUploadProps) {
@@ -32,6 +32,7 @@ export function FileUpload({
     const [selectedFile, setSelectedFile] = useState<File | null>(null)
     const [metadata, setMetadata] = useState<FileMetadata>({ category: 'theory' })
     const [error, setError] = useState<string | null>(null)
+    const [isLoading, setIsLoading] = useState(false)
     const inputRef = useRef<HTMLInputElement>(null)
 
     const handleDrag = (e: React.DragEvent) => {
@@ -86,9 +87,47 @@ export function FileUpload({
 
     const handleSubmit = async () => {
         if (!selectedFile) return
-        await onUpload(selectedFile, metadata)
-        setSelectedFile(null)
-        setMetadata({ category: 'theory' })
+
+        setIsLoading(true)
+        setError(null)
+
+        try {
+            const formData = new FormData()
+            formData.append('file', selectedFile)
+            formData.append('course_id', courseId)
+            formData.append('title', metadata.title || selectedFile.name.replace(/\.[^/.]+$/, ''))
+            formData.append('category', metadata.category)
+            if (metadata.week_number) {
+                formData.append('week_number', String(metadata.week_number))
+            }
+            if (metadata.tags && metadata.tags.length > 0) {
+                formData.append('tags', metadata.tags.join(','))
+            }
+
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/materials/upload`, {
+                method: 'POST',
+                body: formData,
+            })
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}))
+                throw new Error(errorData.detail || 'Upload failed')
+            }
+
+            // Success - clear the form
+            setSelectedFile(null)
+            setMetadata({ category: 'theory' })
+
+            // Notify parent of success
+            if (onUploadSuccess) {
+                onUploadSuccess()
+            }
+        } catch (err: any) {
+            setError(err.message || 'Upload failed')
+            console.error('Upload error:', err)
+        }
+
+        setIsLoading(false)
     }
 
     const clearFile = () => {
@@ -111,8 +150,8 @@ export function FileUpload({
                 {/* Drop Zone */}
                 <div
                     className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${dragActive
-                            ? 'border-primary bg-primary/5'
-                            : 'border-muted-foreground/25 hover:border-primary/50'
+                        ? 'border-primary bg-primary/5'
+                        : 'border-muted-foreground/25 hover:border-primary/50'
                         }`}
                     onDragEnter={handleDrag}
                     onDragLeave={handleDrag}

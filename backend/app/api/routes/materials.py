@@ -1,9 +1,10 @@
 """Materials management routes."""
+import io
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends, status
 from typing import Annotated, Optional
 from uuid import UUID
 
-from app.api.dependencies import get_current_user, get_material_service
+from app.api.dependencies import get_optional_user, get_current_user, get_material_service
 from app.services.material_service import MaterialService
 from app.db.models import Material, MaterialCreate, MaterialResponse, MaterialListResponse
 
@@ -19,7 +20,7 @@ async def upload_material(
     week_number: Optional[int] = Form(None),
     tags: Optional[str] = Form(None),  # comma-separated
     programming_language: Optional[str] = Form(None),
-    current_user: Annotated[dict, Depends(get_current_user)] = None,
+    current_user: Annotated[dict, Depends(get_optional_user)] = None,
     service: MaterialService = Depends(get_material_service)
 ):
     """Upload a new course material."""
@@ -27,17 +28,24 @@ async def upload_material(
         # Parse tags
         tag_list = [t.strip() for t in tags.split(",")] if tags else []
         
-        material_data = MaterialCreate(
+        # Read file content
+        file_content = await file.read()
+        
+        # Wrap bytes in BytesIO for file-like object
+        file_obj = io.BytesIO(file_content)
+        
+        # Call service with correct arguments
+        result = await service.upload_material(
             course_id=course_id,
-            title=title,
+            file=file_obj,
+            filename=file.filename,
+            file_size=len(file_content),
             category=category,
+            title=title,
             week_number=week_number,
             tags=tag_list,
-            programming_language=programming_language,
             uploaded_by=UUID(current_user.id) if current_user else None
         )
-        
-        result = await service.upload_material(file, material_data)
         return result
     except ValueError as e:
         raise HTTPException(

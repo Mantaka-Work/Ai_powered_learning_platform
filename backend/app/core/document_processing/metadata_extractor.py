@@ -153,6 +153,58 @@ class MetadataExtractor:
         
         # Default to theory
         return "theory"
+    
+    def extract_title(self, filename: str, content_preview: Optional[str] = None) -> str:
+        """
+        Extract/suggest a title from filename and optional content preview.
+        
+        Args:
+            filename: Original filename
+            content_preview: Optional preview of file content (unused for now)
+        
+        Returns:
+            Suggested title
+        """
+        path = Path(filename)
+        return self._suggest_title(path.stem)
+    
+    def extract_week_number(self, filename: str, title: Optional[str] = None) -> Optional[int]:
+        """
+        Extract week number from filename or title.
+        
+        Args:
+            filename: Original filename
+            title: Optional title to check for week number
+        
+        Returns:
+            Week number if found, None otherwise
+        """
+        # Try filename first
+        week = self._extract_week(filename)
+        if week:
+            return week
+        
+        # Try title if provided
+        if title:
+            week = self._extract_week(title)
+        
+        return week
+    
+    def detect_programming_language(self, filename: str, file_type: Optional[str] = None) -> Optional[str]:
+        """
+        Detect programming language from filename.
+        
+        Args:
+            filename: Original filename
+            file_type: Optional file type/extension
+        
+        Returns:
+            Programming language if detected, None otherwise
+        """
+        path = Path(filename)
+        ext = path.suffix.lower()
+        
+        return self.LANGUAGE_MAP.get(ext)
 
 
 # Singleton instance

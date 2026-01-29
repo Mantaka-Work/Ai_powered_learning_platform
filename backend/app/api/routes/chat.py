@@ -18,6 +18,7 @@ class CreateSessionRequest(BaseModel):
 
 class ChatMessageRequest(BaseModel):
     session_id: UUID
+    course_id: UUID
     message: str
     include_web_search: bool = False  # Explicitly request web search
 
@@ -158,11 +159,12 @@ async def send_message_sync(
     Use this for simpler integrations that don't support SSE.
     """
     try:
-        response = await service.chat(
+        response = await service.send_message(
             session_id=request.session_id,
-            message=request.message,
-            include_web_search=request.include_web_search,
-            user_id=UUID(current_user.id)
+            user_id=UUID(current_user.id),
+            course_id=request.course_id,
+            content=request.message,
+            include_web_search=request.include_web_search
         )
         return response
     except Exception as e:

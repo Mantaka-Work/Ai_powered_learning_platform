@@ -13,6 +13,21 @@ class VectorRepository:
         self.supabase = get_supabase_client()
         self.table_name = "document_embeddings"
     
+    def _sanitize_text(self, text: str) -> str:
+        """Remove null characters and other problematic unicode from text.
+        
+        PostgreSQL cannot store null characters (\u0000) in text fields.
+        """
+        if not text:
+            return ""
+        # Remove null characters
+        text = text.replace('\x00', '')
+        # Remove other problematic characters
+        text = text.replace('\u0000', '')
+        # Remove any other control characters except newlines and tabs
+        text = ''.join(char for char in text if char == '\n' or char == '\t' or char >= ' ')
+        return text
+    
     async def store_embedding(
         self,
         material_id: UUID,
@@ -24,7 +39,7 @@ class VectorRepository:
         """Store a document chunk embedding."""
         data = {
             "material_id": str(material_id),
-            "content": content,
+            "content": self._sanitize_text(content),
             "embedding": embedding,
             "chunk_index": chunk_index,
             "metadata": metadata or {},
@@ -49,7 +64,7 @@ class VectorRepository:
         data = [
             {
                 "material_id": str(material_id),
-                "content": chunk["content"],
+                "content": self._sanitize_text(chunk["content"]),
                 "embedding": chunk["embedding"],
                 "chunk_index": chunk["chunk_index"],
                 "metadata": chunk.get("metadata", {}),

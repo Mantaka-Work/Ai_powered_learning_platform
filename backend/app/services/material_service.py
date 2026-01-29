@@ -100,22 +100,41 @@ class MaterialService:
         
         # Parse document content
         try:
-            parsed_content = await self.parser.parse(content, file_type, filename)
+            parsed_content = await self.parser.parse(content, filename)
         except Exception as e:
             # Log but don't fail - material is still uploaded
             print(f"Warning: Failed to parse {filename}: {e}")
+            # For binary files like PDF, we can't just decode - raise the error
+            if file_type in ['pdf', 'pptx', 'docx', 'ppt', 'doc']:
+                raise ValueError(f"Failed to extract text from {filename}: {e}")
             parsed_content = content.decode('utf-8', errors='ignore')
         
         # Chunk the content
-        chunks = await self.chunker.chunk(
-            content=parsed_content,
-            file_type=file_type,
-            metadata={"material_id": str(material["id"]), "title": title}
-        )
+        chunk_metadata = {"material_id": str(material["id"]), "title": title}
+        
+        if programming_language:
+            # Use code-aware chunking for code files
+            chunk_objects = self.chunker.chunk_code(
+                code=parsed_content,
+                language=programming_language,
+                metadata=chunk_metadata
+            )
+        else:
+            # Use text chunking for regular documents
+            chunk_objects = self.chunker.chunk_text(
+                text=parsed_content,
+                metadata=chunk_metadata
+            )
+        
+        # Convert Chunk objects to dicts for downstream processing
+        chunks = [
+            {"content": c.content, "metadata": c.metadata, "index": c.index}
+            for c in chunk_objects
+        ]
         
         # Generate embeddings and store
         if chunks:
-            embeddings = await self.embedding_service.embed_batch([c["content"] for c in chunks])
+            embeddings = await self.embedding_service.embed_texts([c["content"] for c in chunks])
             
             embedding_chunks = [
                 {

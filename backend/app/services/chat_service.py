@@ -31,6 +31,9 @@ class ChatService:
             title=title
         )
         
+        # Add message_count for response model compatibility
+        session["message_count"] = 0
+        
         return session
     
     async def get_sessions(

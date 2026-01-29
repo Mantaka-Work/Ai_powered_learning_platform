@@ -1,6 +1,6 @@
 import axios, { AxiosInstance, AxiosError } from 'axios'
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ? `${process.env.NEXT_PUBLIC_API_URL}/api` : 'http://localhost:8000/api'
 
 // Create axios instance
 const api: AxiosInstance = axios.create({
@@ -224,10 +224,11 @@ export const chatApi = {
         content: string,
         includeWebSearch?: boolean
     ): Promise<{ message: ChatMessage; sources: any }> => {
-        const response = await api.post(`/chat/sessions/${sessionId}/message`, {
+        const response = await api.post(`/chat/message/sync`, {
+            session_id: sessionId,
             course_id: courseId,
-            content,
-            include_web_search: includeWebSearch,
+            message: content,
+            include_web_search: includeWebSearch ?? false,
         })
         return response.data
     },

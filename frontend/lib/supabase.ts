@@ -11,6 +11,10 @@ export const signIn = async (email: string, password: string) => {
         email,
         password,
     })
+    // Store the access token for API calls
+    if (data?.session?.access_token) {
+        localStorage.setItem('access_token', data.session.access_token)
+    }
     return { data, error }
 }
 
@@ -28,6 +32,7 @@ export const signUp = async (email: string, password: string, fullName?: string)
 }
 
 export const signOut = async () => {
+    localStorage.removeItem('access_token')
     const { error } = await supabase.auth.signOut()
     return { error }
 }
