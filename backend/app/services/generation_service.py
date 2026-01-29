@@ -45,6 +45,8 @@ class GenerationService:
         """
         start_time = time.time()
         
+        print(f"[GenerationService] Generating {gen_type} for topic: {topic}, use_web: {use_web}")
+        
         # Search for relevant context
         search_results = await self.search_service.hybrid_search(
             query=topic,
@@ -53,9 +55,15 @@ class GenerationService:
             include_web=use_web
         )
         
+        print(f"[GenerationService] Course results: {len(search_results.get('course_results', []))}")
+        print(f"[GenerationService] Web results: {len(search_results.get('web_results', []))}")
+        
         # Prepare context from search results
         course_context = self._prepare_context(search_results.get("course_results", []))
         web_context = self._prepare_web_context(search_results.get("web_results", []))
+        
+        print(f"[GenerationService] Course context length: {len(course_context)}")
+        print(f"[GenerationService] Web context length: {len(web_context)}")
         
         # Generate content
         generated = await self.theory_generator.generate(
@@ -66,21 +74,37 @@ class GenerationService:
             web_context=web_context if use_web else None
         )
         
-        # Prepare sources
+        # Prepare sources with enhanced info
+        course_results = search_results.get("course_results", [])
+        avg_relevance = sum(r["relevance_score"] for r in course_results) / len(course_results) if course_results else 0
+        
         sources = {
             "course": [
                 {"title": r["material_title"], "type": r["file_type"], "relevance": r["relevance_score"]}
-                for r in search_results.get("course_results", [])[:5]
+                for r in course_results[:5]
             ]
         }
         
+        # Add note if course materials have low relevance
+        if avg_relevance < 0.3:
+            sources["note"] = "Limited course materials found for this topic. Enable web search for more content."
+        
         web_sources = []
-        if use_web and search_results.get("web_results"):
-            web_sources = [
-                {"title": r["title"], "url": r["url"], "domain": r["source_domain"]}
-                for r in search_results.get("web_results", [])[:5]
-            ]
-            sources["web"] = web_sources
+        if use_web:
+            web_results = search_results.get("web_results", [])
+            if web_results:
+                web_sources = [
+                    {"title": r.get("title", "Web Source"), "url": r.get("url", ""), "domain": r.get("source_domain", "")}
+                    for r in web_results[:5]
+                ]
+                sources["web"] = web_sources
+            else:
+                # Web search was requested but returned nothing
+                from app.config import settings
+                if not settings.PERPLEXITY_API_KEY:
+                    sources["web_error"] = "Web search unavailable - API key not configured"
+                else:
+                    sources["web_error"] = "No relevant web sources found"
         
         # Calculate source mix ratio
         course_count = len(sources.get("course", []))
@@ -97,13 +121,16 @@ class GenerationService:
                 course_id=course_id
             )
         
+        # Truncate topic for storage (DB limit is 500 chars)
+        stored_topic = topic[:500] if len(topic) > 500 else topic
+        
         # Store generation
         generation_id = uuid4()
         stored = await self.generation_repo.create_generation(
             course_id=course_id,
             user_id=user_id,
             gen_type=f"theory_{gen_type}",
-            topic=topic,
+            topic=stored_topic,
             content=generated["content"],
             validation_status=validation_result["status"] if validation_result else None,
             validation_score=validation_result["score"] if validation_result else None,
@@ -173,25 +200,42 @@ class GenerationService:
             topic=topic,
             course_id=course_id,
             language=language,
+            code_type=code_type,
             course_context=course_context,
             web_context=web_context if use_web else None
         )
         
-        # Prepare sources
+        # Prepare sources with enhanced info
+        course_results = search_results.get("course_results", [])
+        avg_relevance = sum(r["relevance_score"] for r in course_results) / len(course_results) if course_results else 0
+        
         sources = {
             "course": [
                 {"title": r["material_title"], "type": r["file_type"], "relevance": r["relevance_score"]}
-                for r in search_results.get("course_results", [])[:5]
+                for r in course_results[:5]
             ]
         }
         
+        # Add note if course materials have low relevance
+        if avg_relevance < 0.3:
+            sources["note"] = "Limited course materials found for this topic. Enable web search for more content."
+        
         web_sources = []
-        if use_web and search_results.get("web_results"):
-            web_sources = [
-                {"title": r["title"], "url": r["url"], "domain": r["source_domain"]}
-                for r in search_results.get("web_results", [])[:5]
-            ]
-            sources["web"] = web_sources
+        if use_web:
+            web_results = search_results.get("web_results", [])
+            if web_results:
+                web_sources = [
+                    {"title": r.get("title", "Web Source"), "url": r.get("url", ""), "domain": r.get("source_domain", "")}
+                    for r in web_results[:5]
+                ]
+                sources["web"] = web_sources
+            else:
+                # Web search was requested but returned nothing
+                from app.config import settings
+                if not settings.PERPLEXITY_API_KEY:
+                    sources["web_error"] = "Web search unavailable - API key not configured"
+                else:
+                    sources["web_error"] = "No relevant web sources found"
         
         # Calculate source mix ratio
         course_count = len(sources.get("course", []))
@@ -208,12 +252,15 @@ class GenerationService:
                 run_tests=execute
             )
         
+        # Truncate topic for storage (DB limit is 500 chars)
+        stored_topic = topic[:500] if len(topic) > 500 else topic
+        
         # Store generation
         stored = await self.generation_repo.create_generation(
             course_id=course_id,
             user_id=user_id,
             gen_type=f"code_{code_type}",
-            topic=topic,
+            topic=stored_topic,
             content=generated["code"],
             programming_language=language,
             validation_status=validation_result["status"] if validation_result else None,

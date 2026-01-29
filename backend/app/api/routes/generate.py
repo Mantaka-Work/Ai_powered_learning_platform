@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from typing import Optional
 from uuid import UUID
 
-from app.api.dependencies import get_current_user, get_generation_service
+from app.api.dependencies import get_optional_user, get_generation_service
 from app.services.generation_service import GenerationService
 from app.db.models import GeneratedContent, GenerationResponse
 
@@ -23,16 +23,15 @@ class CodeGenerationRequest(BaseModel):
     topic: str
     course_id: UUID
     language: str  # python, javascript, java, cpp, etc.
+    type: str = "example"  # example, solution, explanation
     use_web: bool = True
-    include_tests: bool = False
-    include_comments: bool = True
 
 
 @router.post("/theory", response_model=GenerationResponse)
 async def generate_theory(
     request: TheoryGenerationRequest,
     background_tasks: BackgroundTasks,
-    current_user = Depends(get_current_user),
+    current_user = Depends(get_optional_user),
     service: GenerationService = Depends(get_generation_service)
 ):
     """
@@ -45,13 +44,14 @@ async def generate_theory(
         result = await service.generate_theory(
             topic=request.topic,
             course_id=request.course_id,
-            generation_type=request.type,
+            gen_type=request.type,
             use_web=request.use_web,
-            max_length=request.max_length,
             user_id=UUID(current_user.id) if current_user else None
         )
         return result
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Generation failed: {str(e)}"
@@ -61,7 +61,7 @@ async def generate_theory(
 @router.post("/code", response_model=GenerationResponse)
 async def generate_code(
     request: CodeGenerationRequest,
-    current_user = Depends(get_current_user),
+    current_user = Depends(get_optional_user),
     service: GenerationService = Depends(get_generation_service)
 ):
     """
@@ -75,13 +75,14 @@ async def generate_code(
             topic=request.topic,
             course_id=request.course_id,
             language=request.language,
+            code_type=request.type,
             use_web=request.use_web,
-            include_tests=request.include_tests,
-            include_comments=request.include_comments,
             user_id=UUID(current_user.id) if current_user else None
         )
         return result
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Generation failed: {str(e)}"
@@ -122,7 +123,7 @@ async def get_generation_status(
 @router.post("/{generation_id}/regenerate", response_model=GenerationResponse)
 async def regenerate_content(
     generation_id: UUID,
-    current_user = Depends(get_current_user),
+    current_user = Depends(get_optional_user),
     service: GenerationService = Depends(get_generation_service)
 ):
     """Regenerate content with same parameters."""
@@ -140,7 +141,7 @@ async def regenerate_content(
 async def get_generation_history(
     course_id: UUID,
     limit: int = 20,
-    current_user = Depends(get_current_user),
+    current_user = Depends(get_optional_user),
     service: GenerationService = Depends(get_generation_service)
 ):
     """Get generation history for a course."""

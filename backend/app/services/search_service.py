@@ -105,12 +105,17 @@ class SearchService:
         
         if should_use_web:
             try:
+                print(f"[SearchService] Triggering web search for query: {query}")
                 web_response = await self.web_search.search(query)
+                print(f"[SearchService] Web search response: {web_response}")
                 web_results = web_response.get("results", [])[:limit]
+                print(f"[SearchService] Got {len(web_results)} web results")
                 used_web = True
             except Exception as e:
                 # Log but don't fail the entire search
-                print(f"Web search failed: {e}")
+                print(f"[SearchService] Web search failed: {e}")
+                import traceback
+                traceback.print_exc()
         
         elapsed_ms = int((time.time() - start_time) * 1000)
         

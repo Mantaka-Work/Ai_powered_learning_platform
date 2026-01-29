@@ -108,14 +108,30 @@ INSTRUCTIONS:
 2. Be helpful, accurate, and educational
 3. Start your response with "🌐 **Based on general knowledge:**" to indicate this is not from course materials
 4. If this topic MIGHT be related to their course, suggest they upload relevant materials
-5. Provide clear explanations with examples where helpful
+5. Provide clear explanations with examples where helpful"""
+            
+            # Add web context if available (for general knowledge + web search)
+            if web_context:
+                prompt += """
+
+WEB SEARCH RESULTS (Latest information from the internet):
+---
+{web_context}
+---
+
+Use these web results to provide up-to-date information. Cite sources with their URLs when relevant.""".format(web_context=web_context)
+            
+            prompt += """
 
 Note: The following course materials were found but had low relevance to this question:
 ---
 {context}
 ---
 
-Answer the student's question using your general knowledge.""".format(context=context if context else "No course materials available.")
+Answer the student's question using your general knowledge{web_note}.""".format(
+                context=context if context else "No course materials available.",
+                web_note=" and the web search results" if web_context else ""
+            )
             
             return prompt
         
@@ -136,20 +152,25 @@ COURSE MATERIALS CONTEXT:
 ---
 {context}
 ---
-
-Based on the above context from the student's course materials, answer their question thoroughly and helpfully.
 """.format(context=context if context else "No course materials were found matching this query.")
         
+        # Add web context if web search was enabled (course context + web supplement)
         if web_context:
             prompt += """
-
-SUPPLEMENTARY WEB SEARCH RESULTS (use if course materials need more detail):
+🌐 WEB SEARCH RESULTS (Supplementary latest information):
 ---
 {web_context}
 ---
 
-Note: Prefer course materials (📚) over web results (🌐).
+IMPORTANT: 
+- Primarily use the COURSE MATERIALS (📚) to answer
+- Use WEB RESULTS (🌐) to supplement with latest news, updates, or additional context
+- Clearly indicate when citing web sources vs course materials
+- If web results contradict course materials, mention both perspectives
 """.format(web_context=web_context)
+        
+        prompt += """
+Based on the above context, answer the student's question thoroughly and helpfully."""
         
         return prompt
     

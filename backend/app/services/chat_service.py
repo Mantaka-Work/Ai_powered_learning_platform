@@ -6,6 +6,7 @@ from app.core.rag.chains import get_chains
 from app.core.rag.memory import get_memory
 from app.services.search_service import get_search_service
 from app.db.repositories.chat_repo import get_chat_repository
+from app.core.mcp.perplexity_client import PerplexityClient
 from app.config import settings
 
 
@@ -17,6 +18,7 @@ class ChatService:
         self.memory = get_memory()
         self.search_service = get_search_service()
         self.chat_repo = get_chat_repository()
+        self.perplexity = PerplexityClient()
     
     async def create_session(
         self,
@@ -72,6 +74,7 @@ class ChatService:
         Send a message and get a response.
         
         Returns the complete response (non-streaming).
+        When include_web_search is True, also queries Perplexity for latest web info.
         """
         # Store user message
         await self.chat_repo.add_message(
@@ -83,30 +86,21 @@ class ChatService:
         # Get conversation history
         history = await self.memory.get_history(session_id, limit=10)
         
-        # Search for relevant context
+        # Search for relevant course context
         search_results = await self.search_service.hybrid_search(
             query=content,
             course_id=course_id,
             limit=5,
-            include_web=include_web_search
+            include_web=False  # Don't use old web search, we use Perplexity directly
         )
         
         # Prepare context and determine if it's relevant
         context, context_relevance = self._prepare_context_with_relevance(search_results)
         
         # Determine if we should use course context or general knowledge
-        # Threshold of 0.2 - if avg relevance is above this and we have results, use course context
         use_course_context = context_relevance >= 0.2 and len(search_results.get("course_results", [])) > 0
         
         print(f"[ChatService] Context relevance: {context_relevance:.3f}, Use course context: {use_course_context}")
-        
-        # Generate response with appropriate mode
-        response = await self.rag_chain.generate_response(
-            query=content,
-            context=context if use_course_context else "",
-            chat_history=history,
-            use_general_knowledge=not use_course_context
-        )
         
         # Prepare sources
         sources = {
@@ -120,13 +114,42 @@ class ChatService:
             ]
         }
         
+        # If web search is enabled, query Perplexity
+        web_context = ""
         used_web = False
-        if search_results.get("web_results"):
-            used_web = True
-            sources["web"] = [
-                {"title": r["title"], "url": r["url"]}
-                for r in search_results.get("web_results", [])[:3]
-            ]
+        if include_web_search:
+            print(f"[ChatService] Web search enabled, querying Perplexity...")
+            perplexity_results = await self.perplexity.search(query=content, limit=5, recency="week")
+            
+            if perplexity_results.get("results") and not perplexity_results.get("error"):
+                used_web = True
+                web_results = perplexity_results["results"]
+                
+                # Build web context string
+                web_parts = []
+                for i, r in enumerate(web_results[:3], 1):
+                    title = r.get("title", f"Source {i}")
+                    url = r.get("url", "")
+                    snippet = r.get("snippet", "")
+                    web_parts.append(f"🌐 [Web Source {i}: {title}]\nURL: {url}\n{snippet}")
+                
+                web_context = "\n\n".join(web_parts)
+                
+                sources["web"] = [
+                    {"title": r.get("title", "Web Source"), "url": r.get("url", "")}
+                    for r in web_results[:3]
+                ]
+                
+                print(f"[ChatService] Got {len(web_results)} web results from Perplexity")
+        
+        # Generate response with appropriate mode
+        response = await self.rag_chain.generate_response(
+            query=content,
+            context=context if use_course_context else "",
+            chat_history=history,
+            web_context=web_context if used_web else None,
+            use_general_knowledge=not use_course_context
+        )
         
         # Store assistant message
         message = await self.chat_repo.add_message(
@@ -163,6 +186,7 @@ class ChatService:
         Send a message and stream the response.
         
         Yields chunks of the response as they are generated.
+        When include_web_search is True, also queries Perplexity for latest web info.
         """
         # Store user message
         await self.chat_repo.add_message(
@@ -174,24 +198,23 @@ class ChatService:
         # Get conversation history
         history = await self.memory.get_history(session_id, limit=10)
         
-        # Search for relevant context
+        # Search for relevant course context (always do this)
         search_results = await self.search_service.hybrid_search(
             query=content,
             course_id=course_id,
             limit=5,
-            include_web=include_web_search
+            include_web=False  # Don't use the old web search, we'll use Perplexity directly
         )
         
-        # Prepare context and determine relevance
+        # Prepare course context and determine relevance
         context, context_relevance = self._prepare_context_with_relevance(search_results)
         
         # Determine if we should use course context or general knowledge
-        # Threshold of 0.2 - if avg relevance is above this and we have results, use course context
         use_course_context = context_relevance >= 0.2 and len(search_results.get("course_results", [])) > 0
         
         print(f"[ChatService-Stream] Context relevance: {context_relevance:.3f}, Use course context: {use_course_context}")
         
-        # Prepare sources early
+        # Prepare sources
         sources = {
             "course": [
                 {"title": r["material_title"], "type": r["file_type"], "relevance": r["relevance_score"]}
@@ -199,15 +222,38 @@ class ChatService:
             ]
         }
         
+        # If web search is enabled, query Perplexity for latest info
+        web_context = ""
         used_web = False
-        if search_results.get("web_results"):
-            used_web = True
-            sources["web"] = [
-                {"title": r["title"], "url": r["url"]}
-                for r in search_results.get("web_results", [])[:3]
-            ]
+        if include_web_search:
+            print(f"[ChatService-Stream] Web search enabled, querying Perplexity...")
+            perplexity_results = await self.perplexity.search(query=content, limit=5, recency="week")
+            
+            if perplexity_results.get("results") and not perplexity_results.get("error"):
+                used_web = True
+                web_results = perplexity_results["results"]
+                
+                # Build web context string
+                web_parts = []
+                for i, r in enumerate(web_results[:3], 1):
+                    title = r.get("title", f"Source {i}")
+                    url = r.get("url", "")
+                    snippet = r.get("snippet", "")
+                    web_parts.append(f"🌐 [Web Source {i}: {title}]\nURL: {url}\n{snippet}")
+                
+                web_context = "\n\n".join(web_parts)
+                
+                # Add to sources
+                sources["web"] = [
+                    {"title": r.get("title", "Web Source"), "url": r.get("url", "")}
+                    for r in web_results[:3]
+                ]
+                
+                print(f"[ChatService-Stream] Got {len(web_results)} web results from Perplexity")
+            elif perplexity_results.get("error"):
+                print(f"[ChatService-Stream] Perplexity error: {perplexity_results['error']}")
         
-        # Yield sources first (include whether using general knowledge)
+        # Yield sources first
         yield {
             "type": "sources",
             "sources": sources,
@@ -215,12 +261,13 @@ class ChatService:
             "used_general_knowledge": not use_course_context
         }
         
-        # Stream response
+        # Stream response with both course context and web context if available
         full_response = ""
         async for chunk in self.rag_chain.generate_response_stream(
             query=content,
             context=context if use_course_context else "",
             chat_history=history,
+            web_context=web_context if used_web else None,
             use_general_knowledge=not use_course_context
         ):
             full_response += chunk

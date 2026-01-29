@@ -35,6 +35,7 @@ class PerplexityClient:
             Search results with sources
         """
         if not self.api_key:
+            print("[PerplexityClient] No API key configured!")
             return {
                 "results": [],
                 "error": "Perplexity API key not configured",
@@ -55,11 +56,11 @@ class PerplexityClient:
                         "Content-Type": "application/json"
                     },
                     json={
-                        "model": "llama-3.1-sonar-small-128k-online",
+                        "model": "sonar",  # Latest Perplexity online model
                         "messages": [
                             {
                                 "role": "system",
-                                "content": "You are a helpful search assistant. Provide concise, factual information with sources."
+                                "content": "You are a helpful search assistant. Provide concise, factual information with sources. Include relevant URLs."
                             },
                             {
                                 "role": "user",

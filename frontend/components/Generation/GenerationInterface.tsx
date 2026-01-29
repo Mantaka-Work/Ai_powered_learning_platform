@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { Sparkles, Loader2, Globe, Copy, Check, BookOpen, Code } from 'lucide-react'
+import React, { useState, useRef } from 'react'
+import { Sparkles, Loader2, Globe, Copy, Check, BookOpen, Code, Download, FileText } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -179,7 +179,9 @@ interface GeneratedContentProps {
     validationScore?: number
     sources?: {
         course?: { title: string; type: string; relevance: number }[]
-        web?: { title: string; url: string }[]
+        web?: { title: string; url: string; domain?: string }[]
+        note?: string
+        web_error?: string
     }
     usedWebSearch: boolean
     language?: string
@@ -196,7 +198,12 @@ export function GeneratedContent({
     language,
 }: GeneratedContentProps) {
     const [copied, setCopied] = useState(false)
-    const isCode = type.startsWith('code_')
+    const [isDownloading, setIsDownloading] = useState(false)
+    const contentRef = useRef<HTMLDivElement>(null)
+
+    // Check if this is code content (but NOT explanation which should be rendered as markdown)
+    const isCodeContent = type.startsWith('code_') && type !== 'code_explanation'
+    const isExplanation = type === 'code_explanation'
 
     const handleCopy = async () => {
         await navigator.clipboard.writeText(content)
@@ -204,14 +211,54 @@ export function GeneratedContent({
         setTimeout(() => setCopied(false), 2000)
     }
 
+    const handleDownloadCode = () => {
+        const extension = language || 'txt'
+        const filename = `${topic.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.${extension}`
+        const blob = new Blob([content], { type: 'text/plain' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = filename
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+    }
+
+    const handleDownloadPDF = async () => {
+        if (!contentRef.current) return
+
+        setIsDownloading(true)
+        try {
+            // Dynamically import html2pdf to avoid SSR issues
+            const html2pdf = (await import('html2pdf.js')).default
+
+            const filename = `${topic.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.pdf`
+
+            const opt = {
+                margin: [10, 10, 10, 10] as [number, number, number, number],
+                filename: filename,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2, useCORS: true },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' as const }
+            }
+
+            await html2pdf().set(opt).from(contentRef.current).save()
+        } catch (error) {
+            console.error('PDF download failed:', error)
+        } finally {
+            setIsDownloading(false)
+        }
+    }
+
     return (
         <Card>
             <CardHeader className="pb-2">
                 <div className="flex items-start justify-between">
                     <div>
-                        <CardTitle className="flex items-center gap-2">
-                            {isCode ? <Code className="h-5 w-5" /> : <BookOpen className="h-5 w-5" />}
-                            {topic}
+                        <CardTitle className="flex items-center gap-2 mb-10">
+                            {isCodeContent ? <Code className="h-5 w-5" /> : <BookOpen className="h-5 w-5" />}
+                            {/* {isExplanation ? 'Explanation of your code' : topic} */}
                         </CardTitle>
                         <CardDescription className="flex items-center gap-2 mt-1">
                             <Badge variant="secondary">{type.replace('_', ' ')}</Badge>
@@ -239,6 +286,19 @@ export function GeneratedContent({
                                 {getValidationEmoji(validationStatus)} {validationScore?.toFixed(0)}%
                             </Badge>
                         )}
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={isCodeContent ? handleDownloadCode : handleDownloadPDF}
+                            disabled={isDownloading}
+                            title={isCodeContent ? "Download Code" : "Download PDF"}
+                        >
+                            {isDownloading ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                                <Download className="h-4 w-4" />
+                            )}
+                        </Button>
                         <Button variant="outline" size="sm" onClick={handleCopy}>
                             {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                         </Button>
@@ -247,7 +307,7 @@ export function GeneratedContent({
             </CardHeader>
 
             <CardContent>
-                {isCode ? (
+                {isCodeContent ? (
                     <SyntaxHighlighter
                         language={language || 'text'}
                         style={oneDark}
@@ -256,26 +316,47 @@ export function GeneratedContent({
                         {content}
                     </SyntaxHighlighter>
                 ) : (
-                    <div className="markdown-content prose prose-sm dark:prose-invert max-w-none">
+                    <div ref={contentRef} className="markdown-content prose prose-sm dark:prose-invert max-w-none p-4 bg-white dark:bg-gray-900">
+                        {/* Don't show topic for explanations since it contains the code being explained */}
+                        {!isExplanation && <h1 className="text-xl font-bold mb-4">{topic}</h1>}
                         <ReactMarkdown>{content}</ReactMarkdown>
                     </div>
                 )}
 
                 {/* Sources */}
-                {sources && (sources.course?.length || sources.web?.length) && (
+                {sources && (sources.course?.length || sources.web?.length || sources.note || sources.web_error) && (
                     <div className="mt-4 pt-4 border-t">
                         <p className="text-sm font-medium mb-2">Sources</p>
+
+                        {/* Note about limited course materials */}
+                        {sources.note && (
+                            <p className="text-xs text-amber-600 dark:text-amber-400 mb-2 flex items-center gap-1">
+                                ⚠️ {sources.note}
+                            </p>
+                        )}
+
+                        {/* Web search error */}
+                        {sources.web_error && usedWebSearch && (
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2 flex items-center gap-1">
+                                ℹ️ {sources.web_error}
+                            </p>
+                        )}
+
                         <div className="flex flex-wrap gap-2">
                             {sources.course?.map((s, i) => (
                                 <Badge key={`course-${i}`} variant="secondary" className="text-xs">
-                                    📚 {s.title}
+                                    📚 {s.title} {s.relevance < 0.3 && <span className="opacity-60">(low match)</span>}
                                 </Badge>
                             ))}
                             {sources.web?.map((s, i) => (
                                 <Badge key={`web-${i}`} variant="outline" className="text-xs">
-                                    <a href={s.url} target="_blank" rel="noopener noreferrer" className="hover:underline">
-                                        🌐 {s.title}
-                                    </a>
+                                    {s.url ? (
+                                        <a href={s.url} target="_blank" rel="noopener noreferrer" className="hover:underline flex items-center gap-1">
+                                            🌐 {s.title || s.domain || 'Web Source'}
+                                        </a>
+                                    ) : (
+                                        <span>🌐 {s.title || 'Web Source'}</span>
+                                    )}
                                 </Badge>
                             ))}
                         </div>
