@@ -258,7 +258,7 @@ export function GeneratedContent({
                     <div>
                         <CardTitle className="flex items-center gap-2 mb-10">
                             {isCodeContent ? <Code className="h-5 w-5" /> : <BookOpen className="h-5 w-5" />}
-                            {/* {isExplanation ? 'Explanation of your code' : topic} */}
+                            {isExplanation ? 'Explanation of your code' : topic}
                         </CardTitle>
                         <CardDescription className="flex items-center gap-2 mt-1">
                             <Badge variant="secondary">{type.replace('_', ' ')}</Badge>
