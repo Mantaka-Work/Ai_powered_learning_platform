@@ -173,14 +173,10 @@ export default function CoursePage() {
 
                 {/* Tabs */}
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                    <TabsList className="grid w-full grid-cols-4 mb-8">
+                    <TabsList className="grid w-full grid-cols-3 mb-8">
                         <TabsTrigger value="materials" className="gap-2">
                             <Upload className="h-4 w-4" />
                             Materials
-                        </TabsTrigger>
-                        <TabsTrigger value="search" className="gap-2">
-                            <Search className="h-4 w-4" />
-                            Search
                         </TabsTrigger>
                         <TabsTrigger value="generate" className="gap-2">
                             <Sparkles className="h-4 w-4" />

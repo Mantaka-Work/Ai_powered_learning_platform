@@ -183,63 +183,61 @@ class GenerationService:
         """
         start_time = time.time()
         
-        # Search for relevant context
+        # First search course materials to check relevance
         search_results = await self.search_service.hybrid_search(
             query=f"{topic} {language} code",
             course_id=course_id,
             limit=10,
-            include_web=use_web
+            include_web=False  # First check without web
         )
+        
+        # Check if course materials have low relevance - auto-enable web search
+        course_results = search_results.get("course_results", [])
+        avg_relevance = sum(r["relevance_score"] for r in course_results) / len(course_results) if course_results else 0
+        
+        # Auto-enable web search if relevance is low or user requested it
+        should_use_web = use_web or avg_relevance < 0.35
+        
+        # If we need web search, re-search with web enabled
+        if should_use_web and not use_web:
+            search_results = await self.search_service.hybrid_search(
+                query=f"{topic} {language} code",
+                course_id=course_id,
+                limit=10,
+                include_web=True
+            )
         
         # Prepare context
         course_context = self._prepare_context(search_results.get("course_results", []))
         web_context = self._prepare_web_context(search_results.get("web_results", []))
         
-        # Generate code
+        # Generate code - use web context if available (either user requested or auto-enabled)
         generated = await self.code_generator.generate(
             topic=topic,
             course_id=course_id,
             language=language,
             code_type=code_type,
             course_context=course_context,
-            web_context=web_context if use_web else None
+            web_context=web_context if should_use_web else None
         )
         
-        # Prepare sources with enhanced info
-        course_results = search_results.get("course_results", [])
-        avg_relevance = sum(r["relevance_score"] for r in course_results) / len(course_results) if course_results else 0
-        
-        sources = {
-            "course": [
-                {"title": r["material_title"], "type": r["file_type"], "relevance": r["relevance_score"]}
-                for r in course_results[:5]
-            ]
-        }
-        
-        # Add note if course materials have low relevance
-        if avg_relevance < 0.3:
-            sources["note"] = "Limited course materials found for this topic. Enable web search for more content."
-        
+        # For code generation, we don't show sources to users
+        # Just track internally for storage
         web_sources = []
-        if use_web:
+        if should_use_web:
             web_results = search_results.get("web_results", [])
             if web_results:
                 web_sources = [
                     {"title": r.get("title", "Web Source"), "url": r.get("url", ""), "domain": r.get("source_domain", "")}
                     for r in web_results[:5]
                 ]
-                sources["web"] = web_sources
-            else:
-                # Web search was requested but returned nothing
-                from app.config import settings
-                if not settings.PERPLEXITY_API_KEY:
-                    sources["web_error"] = "Web search unavailable - API key not configured"
-                else:
-                    sources["web_error"] = "No relevant web sources found"
         
-        # Calculate source mix ratio
-        course_count = len(sources.get("course", []))
-        web_count = len(sources.get("web", []))
+        # Internal sources for storage only (not shown to user)
+        sources = {}
+        
+        # Calculate source mix ratio for internal tracking
+        course_count = len(search_results.get("course_results", []))
+        web_count = len(web_sources)
         total = course_count + web_count
         source_mix_ratio = course_count / total if total > 0 else 1.0
         
@@ -285,8 +283,8 @@ class GenerationService:
             "validation_status": validation_result["status"] if validation_result else None,
             "validation_score": validation_result["score"] if validation_result else None,
             "validation_details": validation_result if validation_result else {},
-            "sources": sources,
-            "used_web_search": use_web and bool(web_sources),
+            "sources": None,  # Don't show sources for code generation
+            "used_web_search": should_use_web and bool(web_sources),
             "source_mix_ratio": source_mix_ratio,
             "generation_time_seconds": round(elapsed, 2)
         }
