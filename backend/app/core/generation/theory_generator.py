@@ -4,7 +4,7 @@ from uuid import UUID
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from app.config import settings
+from app.config import get_settings
 from app.core.generation.prompts import THEORY_PROMPTS
 from app.core.rag.retriever import get_retriever
 
@@ -13,6 +13,7 @@ class TheoryGenerator:
     """Generate theory learning materials."""
     
     def __init__(self):
+        settings = get_settings()
         self.llm = ChatOpenAI(
             model=settings.OPENAI_CHAT_MODEL,
             temperature=settings.GENERATION_TEMPERATURE,

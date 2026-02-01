@@ -4,7 +4,7 @@ from typing import Optional, List, Dict, Any
 from uuid import UUID
 from pathlib import Path
 
-from app.config import settings
+from app.config import get_settings
 
 
 class ValidationError(Exception):
@@ -41,6 +41,7 @@ def validate_category(category: str) -> str:
 
 def validate_file_type(filename: str) -> str:
     """Validate file type is supported."""
+    settings = get_settings()
     ext = Path(filename).suffix.lower().lstrip(".")
     
     if ext not in settings.SUPPORTED_FILE_TYPES:
@@ -54,6 +55,7 @@ def validate_file_type(filename: str) -> str:
 
 def validate_file_size(size: int, filename: str) -> int:
     """Validate file size is within limits."""
+    settings = get_settings()
     if size > settings.MAX_UPLOAD_SIZE:
         max_mb = settings.MAX_UPLOAD_SIZE / (1024 * 1024)
         raise ValidationError(

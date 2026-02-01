@@ -9,7 +9,7 @@ from app.core.validation.code_validator import get_code_validator
 from app.core.validation.content_validator import get_content_validator
 from app.services.search_service import get_search_service
 from app.db.repositories.generation_repo import get_generation_repository
-from app.config import settings
+from app.config import get_settings
 
 
 class GenerationService:
@@ -100,7 +100,7 @@ class GenerationService:
                 sources["web"] = web_sources
             else:
                 # Web search was requested but returned nothing
-                from app.config import settings
+                settings = get_settings()
                 if not settings.PERPLEXITY_API_KEY:
                     sources["web_error"] = "Web search unavailable - API key not configured"
                 else:

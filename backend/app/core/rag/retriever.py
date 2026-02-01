@@ -4,7 +4,7 @@ from uuid import UUID
 
 from app.core.rag.vectorstore import get_vector_store
 from app.core.rag.embeddings import get_embeddings_service
-from app.config import settings
+from app.config import get_settings
 
 
 class Retriever:

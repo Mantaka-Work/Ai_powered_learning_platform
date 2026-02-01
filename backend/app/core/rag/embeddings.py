@@ -1,13 +1,14 @@
 """OpenAI embeddings service."""
 from typing import List
 import openai
-from app.config import settings
+from app.config import get_settings
 
 
 class EmbeddingsService:
     """Service for generating text embeddings using OpenAI."""
     
     def __init__(self):
+        settings = get_settings()
         self.client = openai.AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
         self.model = settings.OPENAI_EMBEDDING_MODEL
         self.dimension = settings.EMBEDDING_DIMENSION

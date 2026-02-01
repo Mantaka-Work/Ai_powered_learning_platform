@@ -7,7 +7,7 @@ from app.core.rag.embeddings import get_embeddings_service
 from app.core.rag.retriever import get_retriever
 from app.core.mcp.web_search_service import get_web_search_service
 from app.db.repositories.material_repo import get_material_repository
-from app.config import settings
+from app.config import get_settings
 
 
 class SearchService:
@@ -99,6 +99,7 @@ class SearchService:
         
         if include_web is None:
             # Auto-decide based on relevance threshold
+            settings = get_settings()
             should_use_web = avg_relevance < settings.WEB_SEARCH_RELEVANCE_THRESHOLD
         else:
             should_use_web = include_web

@@ -4,13 +4,14 @@ from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 
-from app.config import settings
+from app.config import get_settings
 
 
 class RAGChains:
     """LangChain chains for RAG-based responses."""
     
     def __init__(self):
+        settings = get_settings()
         self.llm = ChatOpenAI(
             model=settings.OPENAI_CHAT_MODEL,
             temperature=settings.GENERATION_TEMPERATURE,

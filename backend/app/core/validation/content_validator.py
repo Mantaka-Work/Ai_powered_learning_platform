@@ -4,7 +4,7 @@ from uuid import UUID
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage
 
-from app.config import settings
+from app.config import get_settings
 from app.core.rag.retriever import get_retriever
 
 
@@ -20,6 +20,7 @@ class ContentValidator:
     ]
     
     def __init__(self):
+        settings = get_settings()
         self.llm = ChatOpenAI(
             model=settings.OPENAI_CHAT_MODEL,
             temperature=0,  # Deterministic for validation
