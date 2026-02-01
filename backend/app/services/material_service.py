@@ -11,7 +11,7 @@ from app.core.document_processing.parsers import DocumentParser, get_parser
 from app.core.document_processing.chunking import TextChunker, get_chunker
 from app.core.document_processing.metadata_extractor import MetadataExtractor, get_metadata_extractor
 from app.core.rag.embeddings import EmbeddingsService, get_embeddings_service
-from app.config import settings
+from app.config import get_settings
 
 
 class MaterialService:
@@ -45,6 +45,7 @@ class MaterialService:
         Returns:
             Material record with processing status
         """
+        settings = get_settings()
         # Validate file size
         if file_size > settings.MAX_UPLOAD_SIZE:
             raise ValueError(f"File size exceeds maximum of {settings.MAX_UPLOAD_SIZE} bytes")

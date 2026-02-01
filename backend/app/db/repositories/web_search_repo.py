@@ -3,7 +3,7 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
 
 from app.db.repositories.base_repo import BaseRepository
-from app.config import settings
+from app.config import get_settings
 
 
 class WebSearchRepository(BaseRepository):
@@ -29,6 +29,7 @@ class WebSearchRepository(BaseRepository):
         # Check expiration
         cached = result.data
         created = datetime.fromisoformat(cached["created_at"].replace("Z", "+00:00"))
+        settings = get_settings()
         expires = created + timedelta(days=settings.SEARCH_CACHE_DAYS)
         
         if datetime.now(created.tzinfo) > expires:
@@ -72,6 +73,7 @@ class WebSearchRepository(BaseRepository):
     
     async def cleanup_expired(self) -> int:
         """Remove expired cache entries. Returns count of deleted entries."""
+        settings = get_settings()
         expiry_date = datetime.utcnow() - timedelta(days=settings.SEARCH_CACHE_DAYS)
         
         result = self.supabase.table(self.table_name)\
@@ -96,6 +98,7 @@ class WebSearchRepository(BaseRepository):
                 prov = p["provider"]
                 provider_counts[prov] = provider_counts.get(prov, 0) + 1
         
+        settings = get_settings()
         return {
             "total_cached": total,
             "by_provider": provider_counts,

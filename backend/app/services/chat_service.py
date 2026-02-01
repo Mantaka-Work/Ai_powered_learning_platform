@@ -7,7 +7,7 @@ from app.core.rag.memory import get_memory
 from app.services.search_service import get_search_service
 from app.db.repositories.chat_repo import get_chat_repository
 from app.core.mcp.perplexity_client import PerplexityClient
-from app.config import settings
+from app.config import get_settings
 
 
 class ChatService:

@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 
 from app.core.mcp.perplexity_client import get_perplexity_client
 from app.db.supabase_client import get_supabase_client
-from app.config import settings
+from app.config import get_settings
 
 
 class WebSearchService:
@@ -14,6 +14,7 @@ class WebSearchService:
     def __init__(self):
         self.perplexity = get_perplexity_client()
         self.supabase = get_supabase_client()
+        settings = get_settings()
         self.cache_ttl = settings.PERPLEXITY_CACHE_TTL
     
     async def search(

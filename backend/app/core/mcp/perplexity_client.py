@@ -3,7 +3,7 @@ from typing import List, Dict, Any, Optional
 import httpx
 from datetime import datetime, timedelta
 
-from app.config import settings
+from app.config import get_settings
 
 
 class PerplexityClient:
@@ -12,6 +12,7 @@ class PerplexityClient:
     BASE_URL = "https://api.perplexity.ai"
     
     def __init__(self):
+        settings = get_settings()
         self.api_key = settings.PERPLEXITY_API_KEY
         self.rate_limit = settings.PERPLEXITY_RATE_LIMIT
         self._last_request_time = None

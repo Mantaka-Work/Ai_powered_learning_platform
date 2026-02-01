@@ -4,7 +4,7 @@ from uuid import UUID
 import mimetypes
 
 from app.db.supabase_client import get_supabase_client
-from app.config import settings
+from app.config import get_settings
 
 
 class StorageService:

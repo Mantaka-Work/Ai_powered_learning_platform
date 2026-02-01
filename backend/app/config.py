@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     PERPLEXITY_API_KEY: Optional[str] = None
     PERPLEXITY_RATE_LIMIT: int = 5  # searches per minute
     PERPLEXITY_CACHE_TTL: int = 604800  # 7 days in seconds
+    SEARCH_CACHE_DAYS: int = 7  # Cache duration for web searches in days
     
     # Search
     SEARCH_TOP_K: int = 5
@@ -73,6 +74,3 @@ class Settings(BaseSettings):
 def get_settings() -> Settings:
     """Get cached settings instance."""
     return Settings()
-
-
-settings = get_settings()

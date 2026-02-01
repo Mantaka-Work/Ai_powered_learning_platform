@@ -5,7 +5,7 @@ import json
 
 from app.db.supabase_client import get_supabase_client
 from app.core.rag.embeddings import get_embeddings_service
-from app.config import settings
+from app.config import get_settings
 
 
 class VectorStore:

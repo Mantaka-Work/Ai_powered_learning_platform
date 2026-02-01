@@ -3,9 +3,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
-from app.config import settings
+from app.config import get_settings
 from app.api.routes import auth, materials, search, generate, chat, validation, health
 from app.utils.logger import setup_logger
+
+settings = get_settings()
 
 
 @asynccontextmanager

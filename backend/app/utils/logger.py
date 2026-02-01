@@ -3,7 +3,7 @@ import logging
 import sys
 from typing import Optional
 
-from app.config import settings
+from app.config import get_settings
 
 
 def setup_logger(
@@ -26,6 +26,7 @@ def setup_logger(
         # Already configured
         return logger
     
+    settings = get_settings()
     log_level = getattr(logging, (level or settings.LOG_LEVEL).upper(), logging.INFO)
     logger.setLevel(log_level)
     
@@ -48,34 +49,63 @@ def setup_logger(
     return logger
 
 
-# Pre-configured loggers
-app_logger = setup_logger("app")
-api_logger = setup_logger("api")
-rag_logger = setup_logger("rag")
-generation_logger = setup_logger("generation")
-validation_logger = setup_logger("validation")
+# Lazy-initialized loggers
+_loggers = {}
+
+
+def get_logger(name: str) -> logging.Logger:
+    """Get or create a logger with the given name."""
+    if name not in _loggers:
+        _loggers[name] = setup_logger(name)
+    return _loggers[name]
+
+
+# Pre-configured logger getters
+def get_app_logger() -> logging.Logger:
+    """Get app logger."""
+    return get_logger("app")
+
+
+def get_api_logger() -> logging.Logger:
+    """Get API logger."""
+    return get_logger("api")
+
+
+def get_rag_logger() -> logging.Logger:
+    """Get RAG logger."""
+    return get_logger("rag")
+
+
+def get_generation_logger() -> logging.Logger:
+    """Get generation logger."""
+    return get_logger("generation")
+
+
+def get_validation_logger() -> logging.Logger:
+    """Get validation logger."""
+    return get_logger("validation")
 
 
 def log_request(method: str, path: str, status: int, duration_ms: float) -> None:
     """Log an API request."""
-    api_logger.info(f"{method} {path} - {status} ({duration_ms:.2f}ms)")
+    get_api_logger().info(f"{method} {path} - {status} ({duration_ms:.2f}ms)")
 
 
 def log_search(query: str, course_id: str, results: int, web_used: bool) -> None:
     """Log a search operation."""
     web_str = " [+web]" if web_used else ""
-    rag_logger.info(f"Search{web_str}: '{query[:50]}...' in {course_id} -> {results} results")
+    get_rag_logger().info(f"Search{web_str}: '{query[:50]}...' in {course_id} -> {results} results")
 
 
 def log_generation(gen_type: str, topic: str, duration: float, validated: bool) -> None:
     """Log a generation operation."""
     val_str = " [validated]" if validated else ""
-    generation_logger.info(f"Generated {gen_type}{val_str}: '{topic[:50]}...' ({duration:.2f}s)")
+    get_generation_logger().info(f"Generated {gen_type}{val_str}: '{topic[:50]}...' ({duration:.2f}s)")
 
 
 def log_validation(content_type: str, status: str, score: float) -> None:
     """Log a validation result."""
-    validation_logger.info(f"Validation {content_type}: {status} (score: {score:.2f})")
+    get_validation_logger().info(f"Validation {content_type}: {status} (score: {score:.2f})")
 
 
 def log_error(logger_name: str, error: Exception, context: str = "") -> None:
